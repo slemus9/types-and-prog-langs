@@ -14,7 +14,6 @@ object Parser:
     override def toString (): String = 
       val n = token.lineNumber
       val m = token.columnNumber
-      println(token)
       s"For token: ${token.value}:\n\t Parsing error at line $n, column $m: $message"
   end ParsingError
 
@@ -43,7 +42,7 @@ object Parser:
         res.copy(parsed = f(res.parsed))
       }
 
-  given monad: Monad[Parser] = new Monad[Parser] {
+  given monad: Monad[Parser] with
 
     def flatMap [A, B] (p: Parser[A]) (f: A => Parser[B]): Parser[B] = 
       p(_).flatMap { res => 
@@ -62,7 +61,7 @@ object Parser:
     }
 
     def pure[A](x: A): Parser[A] = ParsingSuccess(x, _).asRight
-  }
+  
 
   // Combinators
   def success [A] (a: A): Parser[A] = a.pure
@@ -96,9 +95,9 @@ object Parser:
     s"Expected one of the following values: ${values}"
   )
 
-  def boolean: Parser[Boolean] = trySingle(_.value.toBoolean)
+  def string: Parser[String] = single.map(_.value)
 
-  def char: Parser[Char] = trySingle(_.value.head)
+  def boolean: Parser[Boolean] = trySingle(_.value.toBoolean)
 
   def int: Parser[Int] = trySingle(_.value.toInt)
 
@@ -110,7 +109,10 @@ object Parser:
       If the `p1` parser fails, fallback to parsing with `p2`
     */
     def or (p2: Parser[A]): Parser[A] = 
-      inp => p1(inp) orElse p2(inp)
+      inp => p1(inp) match
+        case r @ Right(_) => r
+        case Left(_)      => p2(inp)
+      
 
     def zeroOrMore: Parser[LazyList[A]] = p1.oneOrMore.or(LazyList.empty.pure)
 
